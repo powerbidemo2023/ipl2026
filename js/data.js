@@ -94,9 +94,9 @@ const MATCHES = [
   {id:69, t1:'MI',  t2:'RR',  date:'24 May', tossTime:isoIST('2026-05-24',15,30), venue:'Mumbai',          pl:false},
   {id:70, t1:'KKR', t2:'DC',  date:'24 May', tossTime:isoIST('2026-05-24',19,30), venue:'Kolkata',         pl:false},
   // ── Playoffs ──────────────────────────────────────────────
-  {id:71, t1:'TBD', t2:'TBD', date:'27 May', tossTime:isoIST('2026-05-27',19,30), venue:'TBD', pl:true, label:'Qualifier 1'},
-  {id:72, t1:'TBD', t2:'TBD', date:'28 May', tossTime:isoIST('2026-05-28',19,30), venue:'TBD', pl:true, label:'Eliminator'},
-  {id:73, t1:'TBD', t2:'TBD', date:'30 May', tossTime:isoIST('2026-05-30',19,30), venue:'TBD', pl:true, label:'Qualifier 2'},
+  {id:71, t1:'TBD', t2:'TBD', date:'26 May', tossTime:isoIST('2026-05-26',19,30), venue:'TBD', pl:true, label:'Qualifier 1'},
+  {id:72, t1:'TBD', t2:'TBD', date:'27 May', tossTime:isoIST('2026-05-27',19,30), venue:'TBD', pl:true, label:'Eliminator'},
+  {id:73, t1:'TBD', t2:'TBD', date:'29 May', tossTime:isoIST('2026-05-29',19,30), venue:'TBD', pl:true, label:'Qualifier 2'},
   {id:74, t1:'TBD', t2:'TBD', date:'31 May', tossTime:isoIST('2026-05-31',19,30), venue:'TBD', pl:true, label:'🏆 FINAL'},
 ];
 
