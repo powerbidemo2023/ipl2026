@@ -1,4 +1,4 @@
-const CACHE = 'predictxi-v1';
+const CACHE = 'predictxi-v2';
 const STATIC = [
   '/',
   '/index.html',
@@ -27,28 +27,34 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch — serve from cache first, fall back to network
+// Fetch — network-first for HTML navigation, cache-first for static assets
 self.addEventListener('fetch', e => {
   // Skip Supabase API calls — always go to network for live data
   if (e.request.url.includes('supabase.co')) return;
 
-  // Cache-first for static assets
+  // Network-first for HTML navigation requests (always get fresh app shell)
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).then(response => {
+        const clone = response.clone();
+        caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        return response;
+      }).catch(() => caches.match(e.request).then(r => r || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (JS, CSS, images, fonts)
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(response => {
-        // Cache new successful GET responses
         if (e.request.method === 'GET' && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE).then(cache => cache.put(e.request, clone));
         }
         return response;
-      }).catch(() => {
-        // Offline fallback — serve index.html for navigation requests
-        if (e.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-      });
+      }).catch(() => null);
     })
   );
 });
