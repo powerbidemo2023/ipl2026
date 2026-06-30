@@ -25,98 +25,11 @@ let adminFilt     = 'all';
 let clockInterval = null;
 let lastLockState = {};
 
-// ── League helpers ────────────────────────────────────────────
-function applyLeagueFilter(query) {
-  if (activeLeague === 'IPL') return query.or('league.eq.IPL,league.is.null');
-  return query.eq('league', activeLeague);
-}
-
-async function queryWithLeague(table, select) {
-  let res = await applyLeagueFilter(sb.from(table).select(select));
-  if (res.error) {
-    // league column doesn't exist yet — fall back to unfiltered, filter client-side by match ID
-    res = await sb.from(table).select(select);
-  }
-  return res;
-}
-
-function populateLeagueSelect() {
-  const select = document.getElementById('league-select');
-  if (!select) return;
-  select.innerHTML = Object.values(LEAGUES).map(cfg =>
-    `<option value="${cfg.key}">${cfg.displayName}</option>`
-  ).join('');
-  select.value = activeLeague;
-}
-
-function setLeagueUI() {
-  const cfg = getLeagueConfig();
-  // Update league pill buttons
-  ['IPL','NFL'].forEach(k => {
-    const btn = document.getElementById('league-btn-' + k);
-    if (!btn) return;
-    if (k === activeLeague) {
-      btn.style.background = '#f5c842'; btn.style.color = '#000'; btn.style.borderColor = 'rgba(245,200,66,0.8)';
-    } else {
-      btn.style.background = 'transparent'; btn.style.color = '#f5c842'; btn.style.borderColor = 'rgba(245,200,66,0.3)';
-    }
-  });
-  const logoS = document.getElementById('logo-s');
-  if (logoS) logoS.textContent = cfg.displayName;
-  const heroEl = document.getElementById('hero-badge');
-  if (heroEl) heroEl.textContent = cfg.heroBadge;
-  const hsTotal = document.getElementById('hs-total');
-  if (hsTotal) hsTotal.textContent = cfg.totalMatches;
-  const filterAll = document.getElementById('filter-all');
-  if (filterAll) filterAll.textContent = `All (${cfg.totalMatches})`;
-  const lbSub = document.getElementById('leaderboard-sub');
-  if (lbSub) lbSub.textContent = `${cfg.displayName} · All Players`;
-  const statsSub = document.getElementById('stats-sub');
-  if (statsSub) statsSub.textContent = cfg.seasonLabel;
-  const msPredSub = document.getElementById('ms-pred-sub');
-  if (msPredSub) msPredSub.textContent = `of ${cfg.totalMatches} matches`;
-  const rulesTotal = document.getElementById('rules-total');
-  if (rulesTotal) rulesTotal.textContent = cfg.totalMatches;
-  populateLeagueSelect();
-}
-
-async function switchLeague(leagueKey) {
-  if (!LEAGUES[leagueKey] || leagueKey === activeLeague) return;
-  setLeague(leagueKey);
-  localStorage.setItem('activeLeague', leagueKey);
-  setLeagueUI();
-  myPredictions = {};
-  allResults    = {};
-  allPickStats  = {};
-  allPickNames  = {};
-  if (currentUser) {
-    await loadAllData();
-    renderApp();
-    if (document.getElementById('page-leaderboard')?.classList.contains('on')) await renderLeaderboard();
-    if (document.getElementById('page-stats')?.classList.contains('on'))       await renderStats();
-    if (document.getElementById('page-admin')?.classList.contains('on'))       await renderAdmin();
-  } else {
-    renderMatches();
-    updateHero();
-  }
-}
-
-// ── Init ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ΓöÇΓöÇ Init ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 window.addEventListener('DOMContentLoaded', async () => {
-  const storedLeague = localStorage.getItem('activeLeague') || 'IPL';
-  setLeague(LEAGUES[storedLeague] ? storedLeague : 'IPL');
-  setLeagueUI();
-
   const { data: { session } } = await sb.auth.getSession();
   if (session) await onLogin(session.user);
-  else {
-    showScreen('auth');
-    // Show dev bypass button on localhost
-    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-      const devEl = document.getElementById('dev-bypass');
-      if (devEl) devEl.style.display = 'block';
-    }
-  }
+  else showScreen('auth');
 
   sb.auth.onAuthStateChange(async (ev, session) => {
     if (ev === 'SIGNED_IN' && session) await onLogin(session.user);
@@ -242,19 +155,17 @@ async function loadAllData() {
 }
 
 async function loadResults() {
-  const { data } = await queryWithLeague('results', 'match_id,winner');
-  const validIds = new Set(REAL_MATCHES.map(m => m.id));
+  const { data } = await sb.from('results').select('match_id,winner');
   allResults = {};
-  if (data) data.filter(r => validIds.has(r.match_id)).forEach(r => { allResults[r.match_id] = r.winner; });
+  if (data) data.forEach(r => { allResults[r.match_id] = r.winner; });
 }
 
 async function loadMyPredictions() {
-  let q = sb.from('predictions').select('match_id,pick').eq('user_id', currentUser.id);
-  let { data, error } = await applyLeagueFilter(q);
-  if (error) ({ data } = await sb.from('predictions').select('match_id,pick').eq('user_id', currentUser.id));
-  const validIds = new Set(REAL_MATCHES.map(m => m.id));
+  const { data } = await sb.from('predictions')
+    .select('match_id,pick')
+    .eq('user_id', currentUser.id);
   myPredictions = {};
-  if (data) data.filter(p => validIds.has(p.match_id)).forEach(p => { myPredictions[p.match_id] = p.pick; });
+  if (data) data.forEach(p => { myPredictions[p.match_id] = p.pick; });
 }
 
 async function loadPlayers() {
@@ -284,10 +195,11 @@ async function loadBroadcast() {
 // ΓöÇΓöÇ Load pick stats (aggregate + names for locked matches) ΓöÇΓöÇ
 async function loadPickStats() {
   // Two separate queries ΓÇö avoids needing a PostgREST FK relationship on predictionsΓåÆprofiles
-  let predsRes = await queryWithLeague('predictions', 'user_id, match_id, pick');
-  const { data: profiles } = await sb.from('profiles').select('id, display_name, email');
-  const preds = predsRes.data;
-  if (predsRes.error) { console.error('loadPickStats error:', predsRes.error.message); return; }
+  const [{ data: preds, error: pe }, { data: profiles }] = await Promise.all([
+    sb.from('predictions').select('user_id, match_id, pick'),
+    sb.from('profiles').select('id, display_name, email'),
+  ]);
+  if (pe) { console.error('loadPickStats error:', pe.message); return; }
   if (!preds) return;
   console.log('[pickStats] loaded', preds.length, 'picks across', new Set(preds.map(p=>p.match_id)).size, 'matches');
 
@@ -477,7 +389,11 @@ function renderMatches() {
   else if (activeFilt==='unpredicted') vis = vis.filter(m=>!myPredictions[m.id]&&!allResults[m.id]);
   else if (activeFilt==='completed')   vis = vis.filter(m=>!!allResults[m.id]);
 
-  const phases = getLeagueConfig().phases;
+  const phases = [
+    {label:'PHASE 1 ┬╖ Mar 28 ΓÇô Apr 9',  ids:rng(1,20)},
+    {label:'PHASE 2 ┬╖ Apr 10 ΓÇô Apr 27', ids:rng(21,50)},
+    {label:'PHASE 3 ┬╖ Apr 28 ΓÇô May 18', ids:rng(51,74)},
+  ];
   let html = '';
 
   if (activeFilt === 'all') {
@@ -1193,17 +1109,6 @@ async function doForgotPassword() {
     errEl.style.color = 'var(--green)';
     errEl.textContent = 'Γ£à Reset link sent! Check your email.';
   }
-}
-
-function devLogin() {
-  // Dev-only: bypass auth to test UI on localhost
-  currentUser = { id: 'dev-user', email: 'dev@localhost', user_metadata: {} };
-  isAdmin = true;
-  allPlayers = [{ uid: 'dev-user', name: 'Dev', email: 'dev@localhost', pts: 0, corr: 0, pred: 0, isAdmin: true, avatar: 'D', color: '#7ec8e3' }];
-  renderApp();
-  showScreen('app');
-  startClock();
-  toast('Dev mode — no DB data', 'warn');
 }
 
 function switchAuthTab(tab){

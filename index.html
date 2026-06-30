@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PREDICT XI — IPL 2026 Prediction League</title>
+<title>PREDICT XI — Prediction League</title>
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
@@ -22,13 +22,18 @@
 <meta name="msapplication-TileImage" content="icons/icon-192.png">
 
 <!-- SEO / share preview -->
-<meta name="description" content="IPL 2026 Prediction League — Pick match winners, earn points, top the leaderboard.">
-<meta property="og:title" content="PREDICT XI — IPL 2026">
+<meta name="description" content="Predict XI Prediction League — Pick match winners, earn points, top the leaderboard.">
+<meta property="og:title" content="PREDICT XI — Prediction League">
 <meta property="og:description" content="Pick match winners. Earn points. Dominate the leaderboard.">
 <meta property="og:image" content="icons/icon-512.png">
 
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<style>
+  .league-switch select{appearance:none;background:rgba(255,255,255,0.06) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23f5c842'/%3E%3C/svg%3E") no-repeat right 8px center;border:1px solid rgba(245,200,66,0.4);border-radius:8px;color:#f5c842;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;padding:6px 28px 6px 10px;cursor:pointer;outline:none;min-width:95px;letter-spacing:.5px;transition:border-color .15s}
+  .league-switch select:hover{border-color:#f5c842}
+  .league-switch select option{background:#0d0e1a;color:#fff}
+</style>
 </head>
 <body>
 
@@ -39,13 +44,14 @@
     <div class="auth-logo">
       <div class="auth-icon">🏏</div>
       <div class="auth-title">PREDICT XI</div>
-      <div class="auth-sub">IPL 2026 · Prediction League</div>
+      <div class="auth-sub" id="auth-sub">Prediction League</div>
     </div>
-
-    <!-- TAB SWITCHER -->
     <div class="auth-tabs">
       <button class="atab on" id="tab-login" onclick="switchAuthTab('login')">Sign In</button>
       <button class="atab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+    </div>
+    <div id="dev-bypass" style="display:none;margin-top:12px;text-align:center">
+      <button onclick="devLogin()" style="padding:8px 20px;background:#1e3a5f;color:#7ec8e3;border:1px dashed #7ec8e3;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">⚡ Dev Bypass (localhost only)</button>
     </div>
 
     <!-- LOGIN FORM -->
@@ -153,7 +159,11 @@
     <div class="hdr-in">
       <div class="logo">
         <div class="logo-icon">🏏</div>
-        <div><div class="logo-t">PREDICT XI</div><div class="logo-s">IPL 2026</div></div>
+        <div><div class="logo-t">PREDICT XI</div><div class="logo-s" id="logo-s">Loading League</div></div>
+      </div>
+      <div id="league-switch-btns" style="display:flex;gap:4px;margin-left:12px;flex-shrink:0">
+        <button id="league-btn-IPL" onclick="switchLeague('IPL')" style="padding:5px 11px;border-radius:6px;border:1.5px solid rgba(245,200,66,0.6);background:#f5c842;color:#000;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">🏏 IPL</button>
+        <button id="league-btn-NFL" onclick="switchLeague('NFL')" style="padding:5px 11px;border-radius:6px;border:1.5px solid rgba(245,200,66,0.3);background:transparent;color:#f5c842;font-size:11px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">🏈 NFL</button>
       </div>
       <div class="nav" id="main-nav">
         <button class="ntab on" onclick="go('predict',this)">Predict</button>
@@ -185,11 +195,11 @@
     <!-- PREDICT -->
     <div id="page-predict" class="page on">
       <div class="hero">
-        <div class="hero-badge">🔥 TATA IPL 2026 · Season Active · RCB Defending Champions</div>
+        <div class="hero-badge" id="hero-badge">Loading league info…</div>
         <h1>PICK YOUR <span>WINNERS.</span></h1>
         <p>One prediction per match — pick who wins. 10 pts for every correct call. Lock it in before toss.</p>
         <div class="hero-stats">
-          <div><div class="hs-v">71</div><div class="hs-l">Matches</div></div>
+          <div><div class="hs-v" id="hs-total">0</div><div class="hs-l">Matches</div></div>
           <div><div class="hs-v" id="hs-pred">0</div><div class="hs-l">Predicted</div></div>
           <div><div class="hs-v" id="hs-pts">0</div><div class="hs-l">My Points</div></div>
           <div><div class="hs-v" id="hs-acc">—</div><div class="hs-l">Accuracy</div></div>
@@ -197,7 +207,7 @@
       </div>
       <div class="ticker"><div class="tk-lbl">🔴 LIVE</div><div class="tk-txt" id="ticker-txt"></div></div>
       <div class="filters">
-        <button class="fbtn on" onclick="setFilter('all',this)">All (71)</button>
+        <button class="fbtn on" id="filter-all" onclick="setFilter('all',this)">All</button>
         <button class="fbtn" onclick="setFilter('live',this)">🔴 Live</button>
         <button class="fbtn" onclick="setFilter('upcoming',this)">📅 Open</button>
         <button class="fbtn" onclick="setFilter('predicted',this)">✅ Predicted</button>
@@ -209,7 +219,7 @@
 
     <!-- LEADERBOARD -->
     <div id="page-leaderboard" class="page">
-      <div class="sec"><div class="sec-t">PREDICTION <span>LEADERBOARD</span></div><div class="sec-sub">IPL 2026 · All Players</div></div>
+      <div class="sec"><div class="sec-t">PREDICTION <span>LEADERBOARD</span></div><div class="sec-sub" id="leaderboard-sub">Loading league… · All Players</div></div>
       <div class="lb-you">
         <div class="lb-rank-big" id="lb-rank">—</div>
         <div>
@@ -228,10 +238,10 @@
 
     <!-- STATS -->
     <div id="page-stats" class="page">
-      <div class="sec"><div class="sec-t">MY <span>STATS</span></div><div class="sec-sub">Season 2026</div></div>
+      <div class="sec"><div class="sec-t">MY <span>STATS</span></div><div class="sec-sub" id="stats-sub">Loading season…</div></div>
       <div class="stats-grid">
         <div class="scard"><div class="sc-lbl">Total Points</div><div class="sc-val" id="ms-pts">0</div><div class="sc-sub">+10 per correct</div></div>
-        <div class="scard"><div class="sc-lbl">Predicted</div><div class="sc-val" id="ms-pred">0</div><div class="sc-sub">of 74 matches</div></div>
+        <div class="scard"><div class="sc-lbl">Predicted</div><div class="sc-val" id="ms-pred">0</div><div class="sc-sub" id="ms-pred-sub">of 0 matches</div></div>
         <div class="scard"><div class="sc-lbl">Correct</div><div class="sc-val" id="ms-corr">0</div><div class="sc-sub">results in</div></div>
         <div class="scard"><div class="sc-lbl">Accuracy</div><div class="sc-val" id="ms-acc">—</div><div class="sc-sub">of settled picks</div></div>
         <div class="scard"><div class="sc-lbl">Best Streak</div><div class="sc-val" id="ms-str">0</div><div class="sc-sub">consecutive wins</div></div>
@@ -250,7 +260,7 @@
         <div class="rc"><div class="rc-pt">+10</div><div class="rc-d">Correct winner prediction</div></div>
         <div class="rc"><div class="rc-pt" style="color:var(--red)">0</div><div class="rc-d">Wrong prediction — no penalty</div></div>
         <div class="rc"><div class="rc-pt" style="color:var(--muted)">0</div><div class="rc-d">Abandoned / No Result match</div></div>
-        <div class="rc"><div class="rc-pt" style="color:var(--gold)">74</div><div class="rc-d">Total matches incl. playoffs</div></div>
+        <div class="rc"><div class="rc-pt" style="color:var(--gold)" id="rules-total">0</div><div class="rc-d">Total matches incl. playoffs</div></div>
       </div>
       <div class="sec" style="margin-bottom:12px"><div class="sec-t" style="font-size:18px">How It Works</div></div>
       <div class="rnote">
@@ -349,7 +359,7 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
+      navigator.serviceWorker.register('sw.js')
         .then(reg => console.log('SW registered:', reg.scope))
         .catch(err => console.log('SW failed:', err));
     });

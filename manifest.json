@@ -1,7 +1,7 @@
 {
-  "name": "PREDICT XI — IPL 2026",
+  "name": "PREDICT XI",
   "short_name": "Predict XI",
-  "description": "IPL 2026 Prediction League — Pick match winners, earn points, top the leaderboard.",
+  "description": "Prediction League — Pick match winners, earn points, top the leaderboard.",
   "start_url": "/ipl2026/",
   "display": "standalone",
   "background_color": "#07080f",
