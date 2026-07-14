@@ -1,4 +1,4 @@
-﻿
+
 const SUPABASE_URL      = 'https://dephieggvbqhpslzwncm.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_cV0zIPW01Dd5sDbkK7YMOQ_twd3V4Be';
 const ADMIN_EMAILS      = ['allservices2022@outlook.com'];
@@ -12,14 +12,14 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-// ΓöÇΓöÇ State ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- State ----------------------------------------------------
 let currentUser   = null;
 let isAdmin       = false;
 let myPredictions = {};  // { matchId: teamCode }
 let allResults    = {};  // { matchId: teamCode|'NR' }
 let allPlayers    = [];
-let allPickStats  = {};  // { matchId: { t1: N, t2: N, total: N } } ΓÇö aggregate counts
-let allPickNames  = {};  // { matchId: { teamCode: [{name,avatar,color}] } } ΓÇö revealed post-lock
+let allPickStats  = {};  // { matchId: { t1: N, t2: N, total: N } } — aggregate counts
+let allPickNames  = {};  // { matchId: { teamCode: [{name,avatar,color}] } } — revealed post-lock
 let activeFilt    = 'all';
 let adminFilt     = 'all';
 let clockInterval = null;
@@ -51,16 +51,26 @@ function populateLeagueSelect() {
 
 function setLeagueUI() {
   const cfg = getLeagueConfig();
-  // Update league pill buttons
-  ['IPL','NFL'].forEach(k => {
+  // Update ALL league buttons
+  Object.keys(LEAGUES).forEach(k => {
     const btn = document.getElementById('league-btn-' + k);
     if (!btn) return;
-    if (k === activeLeague) {
-      btn.style.background = '#f5c842'; btn.style.color = '#000'; btn.style.borderColor = 'rgba(245,200,66,0.8)';
-    } else {
-      btn.style.background = 'transparent'; btn.style.color = '#f5c842'; btn.style.borderColor = 'rgba(245,200,66,0.3)';
-    }
+    const isActive = k === activeLeague;
+    btn.style.background  = isActive ? '#f5c842' : 'transparent';
+    btn.style.color       = isActive ? '#000' : '#f5c842';
+    btn.style.borderColor = isActive ? 'rgba(245,200,66,0.8)' : 'rgba(245,200,66,0.3)';
   });
+  // Show archive notice if viewing archived league
+  const archiveBanner = document.getElementById('archive-banner');
+  if (archiveBanner) {
+    if (cfg.archived) {
+      archiveBanner.style.display = 'flex';
+      const abt = archiveBanner.querySelector('#archive-banner-text');
+      if (abt) abt.textContent = cfg.displayName + ' — Season ended. View your picks and leaderboard. Picking is disabled.';
+    } else {
+      archiveBanner.style.display = 'none';
+    }
+  }
   const logoS = document.getElementById('logo-s');
   if (logoS) logoS.textContent = cfg.displayName;
   const heroEl = document.getElementById('hero-badge');
@@ -101,7 +111,7 @@ async function switchLeague(leagueKey) {
   }
 }
 
-// ── Init ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ── Init -----------------------------------------------------
 window.addEventListener('DOMContentLoaded', async () => {
   const storedLeague = localStorage.getItem('activeLeague') || 'IPL';
   setLeague(LEAGUES[storedLeague] ? storedLeague : 'IPL');
@@ -121,7 +131,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   sb.auth.onAuthStateChange(async (ev, session) => {
     if (ev === 'SIGNED_IN' && session) await onLogin(session.user);
     else if (ev === 'TOKEN_REFRESHED' && session) {
-      // Silently keep currentUser up to date ΓÇö no full reload needed
+      // Silently keep currentUser up to date — no full reload needed
       currentUser = session.user;
     }
     else if (ev === 'SIGNED_OUT') { showScreen('auth'); stopClock(); }
@@ -139,12 +149,12 @@ async function onLogin(user) {
   subscribeToUpdates();
 }
 
-// ΓöÇΓöÇ Realtime subscriptions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Realtime subscriptions -----------------------------------
 function subscribeToUpdates() {
   // Remove any existing channels to avoid duplicates on re-login
   sb.getChannels().forEach(ch => sb.removeChannel(ch));
 
-  // Results change ΓåÆ refresh cards + hero for everyone
+  // Results change →Æ refresh cards + hero for everyone
   sb.channel('results-channel')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'results' }, async () => {
       await loadResults();
@@ -157,7 +167,7 @@ function subscribeToUpdates() {
     })
     .subscribe();
 
-  // Playoff config change ΓåÆ reload overrides and re-render matches for all users
+  // Playoff config change →Æ reload overrides and re-render matches for all users
   sb.channel('playoff-channel')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'playoff_config' }, async () => {
       await loadPlayoffOverrides();
@@ -166,7 +176,7 @@ function subscribeToUpdates() {
     })
     .subscribe();
 
-  // Predictions change ΓåÆ refresh pick stats and re-render cards for all users
+  // Predictions change →Æ refresh pick stats and re-render cards for all users
   sb.channel('picks-channel')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'predictions' }, async () => {
       await loadPickStats();
@@ -174,7 +184,7 @@ function subscribeToUpdates() {
     })
     .subscribe();
 
-  // Profiles change ΓåÆ refresh leaderboard/stats if visible
+  // Profiles change →Æ refresh leaderboard/stats if visible
   sb.channel('profiles-channel')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async () => {
       await loadPlayers();
@@ -185,7 +195,7 @@ function subscribeToUpdates() {
     })
     .subscribe();
 
-  // Broadcast change ΓåÆ show banner
+  // Broadcast change →Æ show banner
   sb.channel('broadcast-channel')
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'broadcast' }, payload => {
       const msg = payload.new.message;
@@ -195,7 +205,7 @@ function subscribeToUpdates() {
     .subscribe();
 }
 
-// ΓöÇΓöÇ Playoff schedule overrides (persisted in Supabase playoff_config) ΓöÇΓöÇ
+// -- Playoff schedule overrides (persisted in Supabase playoff_config) --
 // Table schema:
 //   CREATE TABLE playoff_config (
 //     match_id  int  PRIMARY KEY,
@@ -217,7 +227,7 @@ async function loadPlayoffOverrides() {
     m.t1    = ov.t1    || 'TBD';
     m.t2    = ov.t2    || 'TBD';
     m.venue = ov.venue || 'TBD';
-    // REAL_MATCHES now includes all matches ΓÇö no push needed
+    // REAL_MATCHES now includes all matches — no push needed
   });
 }
 
@@ -234,7 +244,7 @@ async function clearPlayoffOverride(mid) {
   if (error) console.error('clearPlayoffOverride:', error.message);
 }
 
-// ΓöÇΓöÇ Load data from Supabase ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Load data from Supabase ----------------------------------
 async function loadAllData() {
   await Promise.all([loadResults(), loadMyPredictions(), loadPlayers(), loadBroadcast(), loadPlayoffOverrides()]);
   await loadPickStats(); // needs allPlayers + MATCHES ready first
@@ -281,9 +291,9 @@ async function loadBroadcast() {
   if (data?.message) showBroadcast(data.message);
 }
 
-// ΓöÇΓöÇ Load pick stats (aggregate + names for locked matches) ΓöÇΓöÇ
+// -- Load pick stats (aggregate + names for locked matches) --
 async function loadPickStats() {
-  // Two separate queries ΓÇö avoids needing a PostgREST FK relationship on predictionsΓåÆprofiles
+  // Two separate queries — avoids needing a PostgREST FK relationship on predictions→Æprofiles
   let predsRes = await queryWithLeague('predictions', 'user_id, match_id, pick');
   const { data: profiles } = await sb.from('profiles').select('id, display_name, email');
   const preds = predsRes.data;
@@ -291,7 +301,7 @@ async function loadPickStats() {
   if (!preds) return;
   console.log('[pickStats] loaded', preds.length, 'picks across', new Set(preds.map(p=>p.match_id)).size, 'matches');
 
-  // Build a quick user_id ΓåÆ profile lookup
+  // Build a quick user_id →Æ profile lookup
   const profileMap = {};
   (profiles || []).forEach(p => { profileMap[p.id] = p; });
 
@@ -304,13 +314,13 @@ async function loadPickStats() {
     const m    = MATCHES.find(x => x.id === mid);
     if (!m) return;
 
-    // Aggregate counts ΓÇö always visible
+    // Aggregate counts — always visible
     if (!allPickStats[mid]) allPickStats[mid] = { t1: 0, t2: 0, total: 0 };
     if (team === m.t1)      allPickStats[mid].t1++;
     else if (team === m.t2) allPickStats[mid].t2++;
     allPickStats[mid].total++;
 
-    // Named picks ΓÇö only revealed once match is locked
+    // Named picks — only revealed once match is locked
     if (isMatchLocked(m)) {
       const prof   = profileMap[row.user_id] || {};
       const name   = prof.display_name || prof.email?.split('@')[0] || 'Player';
@@ -327,12 +337,12 @@ async function loadPickStats() {
   });
 }
 
-// ΓöÇΓöÇ Save prediction to Supabase ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Save prediction to Supabase ------------------------------
 async function savePrediction(matchId, team) {
-  // Ensure session is fresh before writing ΓÇö prevents silent failures after long idle
+  // Ensure session is fresh before writing — prevents silent failures after long idle
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
-    toast('Session expired ΓÇö please sign in again', 'err');
+    toast('Session expired — please sign in again', 'err');
     showScreen('auth');
     return;
   }
@@ -341,7 +351,7 @@ async function savePrediction(matchId, team) {
     { onConflict: 'user_id,match_id' }
   );
   if (error) {
-    toast('Pick not saved ΓÇö ' + error.message, 'err');
+    toast('Pick not saved — ' + error.message, 'err');
     console.error('savePrediction:', error);
     return;
   }
@@ -357,7 +367,7 @@ async function refreshMyStats() {
     .eq('id', currentUser.id);
 }
 
-// ΓöÇΓöÇ Save result to Supabase (admin only) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Save result to Supabase (admin only) ---------------------
 async function saveResult(matchId, winner) {
   await sb.from('results').upsert(
     { match_id: matchId, winner, set_by: currentUser.id, set_at: new Date().toISOString() },
@@ -400,7 +410,7 @@ async function recalcAllPlayerPoints() {
   await loadPlayers();
 }
 
-// ΓöÇΓöÇ Scoring (local calc for display) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Scoring (local calc for display) -------------------------
 function calcPts(mid) {
   const pred = myPredictions[mid], res = allResults[mid];
   if (!pred || !res) return null;
@@ -415,7 +425,7 @@ function calcMyAcc() {
   return s.length ? Math.round(s.filter(m => calcPts(m.id) > 0).length / s.length * 100) : null;
 }
 
-// ΓöÇΓöÇ Clock (1-second tick for auto-lock countdowns) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Clock (1-second tick for auto-lock countdowns) ------------
 function startClock() {
   stopClock();
   clockInterval = setInterval(clockTick, 1000);
@@ -430,7 +440,7 @@ function clockTick() {
     if (nowLocked && !lastLockState[m.id]) {
       lastLockState[m.id] = true;
       needsRender = true;
-      toast(`≡ƒöÆ Match ${m.id} (${m.t1} vs ${m.t2}) LOCKED ΓÇö toss in 1 min!`, 'warn');
+      toast(`🔒 Match ${m.id} (${m.t1} vs ${m.t2}) LOCKED — toss in 1 min!`, 'warn');
     }
     const el = document.getElementById(`cd-${m.id}`);
     if (el) el.textContent = countdownLabel(m);
@@ -441,15 +451,15 @@ function clockTick() {
 function countdownLabel(m) {
   if (allResults[m.id]) return '';
   const secs = secsUntilLock(m);
-  if (secs <= 0) return '≡ƒöÆ LOCKED';
-  if (secs < 60) return `≡ƒö┤ Locks in ${secs}s`;
+  if (secs <= 0) return '🔒 LOCKED';
+  if (secs < 60) return `🔴 Locks in ${secs}s`;
   const mins = Math.ceil(secs / 60);
-  if (mins <= 60) return `ΓÅ▒ ${mins}m to lock`;
+  if (mins <= 60) return `⏱ ${mins}m to lock`;
   const hrs = Math.floor(secs / 3600), rem = Math.ceil((secs % 3600) / 60);
-  return `ΓÅ▒ ${hrs}h ${rem}m`;
+  return `⏱ ${hrs}h ${rem}m`;
 }
 
-// ΓöÇΓöÇ Render app shell ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Render app shell -----------------------------------------
 function renderApp() {
   if (isAdmin) document.getElementById('admin-nav-btn')?.classList.remove('hidden');
   const name = currentUser?.user_metadata?.display_name || currentUser?.email?.split('@')[0] || 'User';
@@ -464,11 +474,11 @@ function renderApp() {
 }
 
 function buildTicker() {
-  const t = REAL_MATCHES.slice(0,14).map(m=>`M${m.id}: ${m.t1} vs ${m.t2} ┬╖ ${m.date}`).join('   |   ');
+  const t = REAL_MATCHES.slice(0,14).map(m=>`M${m.id}: ${m.t1} vs ${m.t2} · ${m.date}`).join('   |   ');
   document.getElementById('ticker-txt').textContent = t + '   |   ' + t;
 }
 
-// ΓöÇΓöÇ Match cards ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Match cards ----------------------------------------------
 function renderMatches() {
   let vis = REAL_MATCHES;
   if      (activeFilt==='live')        vis = vis.filter(m=>!isMatchLocked(m)&&!allResults[m.id]&&secsUntilLock(m)<7200);
@@ -496,7 +506,7 @@ function renderMatches() {
     }
 
     if (done.length) {
-      html += `<div class="phase-hdr" style="margin-top:24px">≡ƒÅü COMPLETED MATCHES</div><div class="grid">`;
+      html += `<div class="phase-hdr" style="margin-top:24px">🏁 COMPLETED MATCHES</div><div class="grid">`;
       [...done].reverse().forEach(m => { html += matchCard(m); });
       html += '</div>';
     }
@@ -517,7 +527,7 @@ function renderMatches() {
 function rng(a,b){const r=[];for(let i=a;i<=b;i++)r.push(i);return r;}
 
 function matchCard(m) {
-  // TBD playoff ΓÇö show a placeholder card, not pickable
+  // TBD playoff — show a placeholder card, not pickable
   if (m.t1 === 'TBD' || m.t2 === 'TBD') return tbdCard(m);
 
   const t1=TEAMS[m.t1], t2=TEAMS[m.t2];
@@ -533,10 +543,11 @@ function matchCard(m) {
   else if (pred&&!locked) cardCls+=' predicted';
 
   let badge='OPEN', bc='b-open';
-  if (res)          {badge='RESULT IN'; bc='b-done';}
-  else if (locked)  {badge='≡ƒöÆ LOCKED'; bc='b-live';}
-  else if (imminent){badge='ΓÜá CLOSING'; bc='b-live';}
-  else if (pred)    {badge='PREDICTED'; bc='b-pred';}
+  if (res)              {badge='RESULT IN'; bc='b-done';}
+  else if (isArchived()){badge='🗄 ARCHIVED'; bc='b-live';}
+  else if (locked)      {badge='🔒 LOCKED'; bc='b-live';}
+  else if (imminent)    {badge='⚠ CLOSING'; bc='b-live';}
+  else if (pred)        {badge='PREDICTED'; bc='b-pred';}
 
   function btnCls(team) {
     if (res) {
@@ -549,31 +560,34 @@ function matchCard(m) {
     return pred===team?'pbtn selected':'pbtn';
   }
 
-  const canPick = !locked && !res;
+  const canPick = !locked && !res && !isArchived();
   const o1=canPick?`onclick="pick(${m.id},'${m.t1}')"` :'';
   const o2=canPick?`onclick="pick(${m.id},'${m.t2}')"` :'';
 
   let rl='';
   if (res&&p!==null) {
-    if (p>0)     rl=`<div class="res-label lbl-w">Γ£à +${p} pts ΓÇö Correct!</div>`;
-    else if (pred) rl=`<div class="res-label lbl-l">Γ¥î 0 pts ΓÇö ${TEAMS[res]?.n||res} won</div>`;
-    else           rl=`<div class="res-label lbl-n">No prediction ΓÇö ${TEAMS[res]?.n||res} won</div>`;
+    if (p>0)     rl=`<div class="res-label lbl-w">✅ +${p} pts — Correct!</div>`;
+    else if (pred) rl=`<div class="res-label lbl-l">❌ 0 pts — ${TEAMS[res]?.n||res} won</div>`;
+    else           rl=`<div class="res-label lbl-n">No prediction — ${TEAMS[res]?.n||res} won</div>`;
   }
 
   return `
   <div class="${cardCls}">
     <div class="mcard-top">
-      <div class="mnum">MATCH ${m.id}${m.pl?' ┬╖ '+m.label:''}</div>
-      <div class="badge ${bc}">${badge}</div>
+      <div class="mnum">MATCH ${m.id}${m.pl?' · '+m.label:''}</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        ${m.network?`<span style="font-size:10px;font-weight:700;background:rgba(1,51,105,0.5);color:#7ba7d4;padding:2px 6px;border-radius:6px">${m.network}</span>`:''}
+        <div class="badge ${bc}">${badge}</div>
+      </div>
     </div>
     <div class="teams">
-      <div class="team"><div class="t-emoji">${t1?.e||'≡ƒÅÅ'}</div><div class="t-code">${m.t1}</div><div class="t-name">${t1?.n||''}</div></div>
+      <div class="team"><div class="t-emoji">${t1?.e||'👤'}</div><div class="t-code">${m.t1}</div><div class="t-name">${t1?.n||''}</div></div>
       <div class="vs">VS</div>
-      <div class="team"><div class="t-emoji">${t2?.e||'≡ƒÅÅ'}</div><div class="t-code">${m.t2}</div><div class="t-name">${t2?.n||''}</div></div>
+      <div class="team"><div class="t-emoji">${t2?.e||'👤'}</div><div class="t-code">${m.t2}</div><div class="t-name">${t2?.n||''}</div></div>
     </div>
     <div class="minfo">
-      <div class="venue">≡ƒôì ${m.venue}</div>
-      <div class="mdate">≡ƒôà ${m.date} ┬╖ ${matchTimeLabel(m)}</div>
+      <div class="venue">📍 ${m.venue}</div>
+      <div class="mdate">📅 ${m.date} · ${matchTimeLabel(m)}</div>
       ${!res?`<div class="${imminent?'cd-chip cd-urgent':'cd-chip'}" id="cd-${m.id}">${countdownLabel(m)}</div>`:''}
     </div>
     <div class="pred-area">
@@ -581,13 +595,13 @@ function matchCard(m) {
       <button class="${btnCls(m.t2)}" ${o2}>${t2?.e||''} ${m.t2}</button>
     </div>
     ${rl}
-    ${locked&&!res&&pred?`<div class="res-label lbl-n" style="color:var(--gold)">≡ƒöÆ Your pick: ${pred} ┬╖ Awaiting result</div>`:''}
+    ${locked&&!res&&pred?`<div class="res-label lbl-n" style="color:var(--gold)">🔒 Your pick: ${pred} · Awaiting result</div>`:''}
     ${pickStatsHtml(m, locked)}
   </div>`;
 }
 
 function pickStatsHtml(m, locked) {
-  // Only show pick stats after match is locked ΓÇö no % revealed before lock
+  // Only show pick stats after match is locked — no % revealed before lock
   if (!locked) return '';
 
   const stats = allPickStats[m.id];
@@ -631,58 +645,59 @@ function pickStatsHtml(m, locked) {
   </div>`;
 }
 
-// ΓöÇΓöÇ TBD placeholder card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- TBD placeholder card -------------------------------------
 function tbdCard(m) {
   return `
   <div class="mcard" style="opacity:0.6;border-style:dashed">
     <div class="mcard-top">
       <div class="mnum">${m.label || 'MATCH '+m.id}</div>
-      <div class="badge b-open">≡ƒùô TBD</div>
+      <div class="badge b-open">📋 TBD</div>
     </div>
     <div class="teams">
-      <div class="team"><div class="t-emoji">≡ƒÅÅ</div><div class="t-code">TBD</div><div class="t-name">To be decided</div></div>
+      <div class="team"><div class="t-emoji">👤</div><div class="t-code">TBD</div><div class="t-name">To be decided</div></div>
       <div class="vs">VS</div>
-      <div class="team"><div class="t-emoji">≡ƒÅÅ</div><div class="t-code">TBD</div><div class="t-name">To be decided</div></div>
+      <div class="team"><div class="t-emoji">👤</div><div class="t-code">TBD</div><div class="t-name">To be decided</div></div>
     </div>
     <div class="minfo">
-      <div class="venue">≡ƒôì ${m.venue}</div>
-      <div class="mdate">≡ƒôà ${m.date}</div>
+      <div class="venue">📍 ${m.venue}</div>
+      <div class="mdate">📅 ${m.date}</div>
     </div>
     <div style="text-align:center;font-size:12px;color:var(--muted);padding:8px 0">
-      ΓÅ│ Teams announced after league stage
+      → Teams announced after league stage
     </div>
   </div>`;
 }
 
-// ΓöÇΓöÇ Pick ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Pick -----------------------------------------------------
 async function pick(mid, team) {
+  if (isArchived()) { toast('This season is archived — picks are closed', 'err'); return; }
   if (allResults[mid] || isMatchLocked(mid)) return;
   myPredictions[mid] = team;
   renderMatches();
   updateHero();
-  toast(`≡ƒöÆ ${team} locked in for Match ${mid}!`);
+  toast(`🔒 ${team} locked in for Match ${mid}!`);
   await savePrediction(mid, team);
 }
 
-// ΓöÇΓöÇ Hero stats ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Hero stats ------------------------------------------------
 function updateHero() {
   const pts=calcMyTotalPts(), pred=Object.keys(myPredictions).length, acc=calcMyAcc();
   document.getElementById('hs-pred').textContent = pred;
   document.getElementById('hs-pts').textContent  = pts;
-  document.getElementById('hs-acc').textContent  = acc!==null?acc+'%':'ΓÇö';
+  document.getElementById('hs-acc').textContent  = acc!==null?acc+'%':'—';
   document.getElementById('hdr-pts').textContent = pts+' PTS';
 }
 
-// ΓöÇΓöÇ Leaderboard ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Leaderboard -----------------------------------------------
 async function renderLeaderboard() {
   const tbody = document.getElementById('lb-body');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">LoadingΓÇª</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Loading…</td></tr>';
 
   try {
     await loadPlayers();
   } catch(e) {
     console.error('renderLeaderboard loadPlayers failed:', e);
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Failed to load ΓÇö try refreshing.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:13px;padding:20px">Failed to load — try refreshing.</td></tr>';
     return;
   }
 
@@ -709,12 +724,12 @@ async function renderLeaderboard() {
 
   const myIdx = sorted.findIndex(p => p.uid === currentUser?.id);
   const me    = sorted[myIdx] || {};
-  const myRank = myIdx >= 0 ? ranks[myIdx] : 'ΓÇö';
+  const myRank = myIdx >= 0 ? ranks[myIdx] : '—';
 
   document.getElementById('lb-rank').textContent   = myRank;
   document.getElementById('lb-myname').textContent = me.name || 'You';
   document.getElementById('lb-pts').textContent    = (me.pts || 0) + ' PTS';
-  document.getElementById('lb-sub').textContent    = `${me.corr||0} correct ┬╖ ${me.pred||0} predicted`;
+  document.getElementById('lb-sub').textContent    = `${me.corr||0} correct · ${me.pred||0} predicted`;
 
   tbody.innerHTML = sorted.map((p, i) => {
     const isMe  = p.uid === currentUser?.id;
@@ -734,30 +749,30 @@ async function renderLeaderboard() {
   }).join('');
 }
 
-// ΓöÇΓöÇ My Stats ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- My Stats --------------------------------------------------
 async function renderStats() {
   await loadPlayers(); // fresh fetch so rank is always current
   const pts=calcMyTotalPts(), pred=Object.keys(myPredictions).length, corr=calcMyCorrect(), acc=calcMyAcc();
   document.getElementById('ms-pts').textContent  = pts;
   document.getElementById('ms-pred').textContent = pred;
   document.getElementById('ms-corr').textContent = corr;
-  document.getElementById('ms-acc').textContent  = acc!==null?acc+'%':'ΓÇö';
+  document.getElementById('ms-acc').textContent  = acc!==null?acc+'%':'—';
   let best=0,cur=0;
   REAL_MATCHES.forEach(m=>{const x=calcPts(m.id);if(x===null){cur=0;return;}x>0?(cur++,best=Math.max(best,cur)):(cur=0);});
   document.getElementById('ms-str').textContent = best;
   const sorted=[...allPlayers].sort((a,b)=>b.pts-a.pts);
-  // Dense rank ΓÇö same pts = same rank, no gaps (1,1,2 not 1,1,3)
+  // Dense rank — same pts = same rank, no gaps (1,1,2 not 1,1,3)
   let sRank=1;
   const myStatsIdx=sorted.findIndex(p=>p.uid===currentUser?.id);
   sorted.forEach((p,i)=>{
     if(i>0&&p.pts!==sorted[i-1].pts) sRank++;
     if(i===myStatsIdx) document.getElementById('ms-rank').textContent=sRank;
   });
-  if(myStatsIdx<0) document.getElementById('ms-rank').textContent='ΓÇö';
+  if(myStatsIdx<0) document.getElementById('ms-rank').textContent='—';
   const settled=REAL_MATCHES.filter(m=>myPredictions[m.id]&&allResults[m.id]).slice(-20);
   document.getElementById('streak-row').innerHTML=
     settled.map(m=>calcPts(m.id)>0?`<div class="sd sw">W</div>`:`<div class="sd sl">L</div>`).join('')+
-    Array(Math.max(0,10-settled.length)).fill('<div class="sd sp">┬╖</div>').join('');
+    Array(Math.max(0,10-settled.length)).fill('<div class="sd sp">·</div>').join('');
   const hist=REAL_MATCHES.filter(m=>myPredictions[m.id]).reverse().slice(0,50);
   if(!hist.length){document.getElementById('hist-list').innerHTML=`<div style="color:var(--muted);font-size:13px;padding:10px 0">No predictions yet.</div>`;return;}
   document.getElementById('hist-list').innerHTML=hist.map(m=>{
@@ -767,33 +782,33 @@ async function renderStats() {
     else if(x>0){ph=`<div class="hrow-pts hp-pos">+${x} pts</div>`;rc='hrow hw';}
     else        {ph=`<div class="hrow-pts hp-neg">0 pts</div>`;rc='hrow hl';}
     return `<div class="${rc}">
-      <div style="font-size:18px;width:24px;flex-shrink:0">${TEAMS[team]?.e||'≡ƒÅÅ'}</div>
+      <div style="font-size:18px;width:24px;flex-shrink:0">${TEAMS[team]?.e||'👤'}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:500">Match ${m.id}: ${m.t1} vs ${m.t2}</div>
-        <div style="font-size:11px;color:var(--muted)">Picked: ${team} ┬╖ ${m.date}${allResults[m.id]?' ┬╖ Winner: '+allResults[m.id]:isMatchLocked(m)?' ┬╖ ≡ƒöÆ Locked':''}</div>
+        <div style="font-size:11px;color:var(--muted)">Picked: ${team} · ${m.date}${allResults[m.id]?' · Winner: '+allResults[m.id]:isMatchLocked(m)?' · 🔒 Locked':''}</div>
       </div>${ph}</div>`;
   }).join('');
 }
 
-// ΓöÇΓöÇ Admin ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Admin -----------------------------------------------------
 async function renderAdmin() { await Promise.all([loadResults(), loadPlayers()]); renderAdminResults(); renderAdminUsers(); renderAdminMatchStatus(); renderAdminPlayoffs(); }
 
 function renderAdminResults() {
-  // Exclude TBD playoffs from results tab ΓÇö those are managed in Playoffs tab
+  // Exclude TBD playoffs from results tab — those are managed in Playoffs tab
   const ALL_REAL = REAL_MATCHES.filter(m => m.t1 !== 'TBD' && m.t2 !== 'TBD');
 
   function cardHtml(m) {
     const t1=TEAMS[m.t1],t2=TEAMS[m.t2],res=allResults[m.id];
     return `<div class="ac">
-      <div class="ac-title">Match ${m.id} ┬╖ ${m.t1} vs ${m.t2}</div>
-      <div class="ac-sub">${m.date} ┬╖ ${matchTimeLabel(m)} ┬╖ ${isMatchLocked(m)?'≡ƒöÆ Locked':'ΓÅ▒ '+countdownLabel(m)}</div>
+      <div class="ac-title">Match ${m.id} · ${m.t1} vs ${m.t2}</div>
+      <div class="ac-sub">${m.date} · ${matchTimeLabel(m)} · ${isMatchLocked(m)?'🔒 Locked':'⏱ '+countdownLabel(m)}</div>
       <div class="ac-btns">
         <button class="arbtn ${res===m.t1?'set':''}" onclick="adminSetResult(${m.id},'${m.t1}')">${t1?.e} ${m.t1}</button>
         <button class="arbtn ${res===m.t2?'set':''}" onclick="adminSetResult(${m.id},'${m.t2}')">${t2?.e} ${m.t2}</button>
         <button class="arbtn ${res==='NR'?'set-nr':''}" onclick="adminSetResult(${m.id},'NR')">No Result</button>
-        ${res?`<button class="arbtn set-clr" onclick="adminClearResult(${m.id})">Γ£ò Clear</button>`:''}
+        ${res?`<button class="arbtn set-clr" onclick="adminClearResult(${m.id})">✘ Clear</button>`:''}
       </div>
-      ${res?`<div style="font-size:11px;margin-top:8px;color:var(--green)">Γ£à Winner: <b>${res}</b></div>`:''}
+      ${res?`<div style="font-size:11px;margin-top:8px;color:var(--green)">✅ Winner: <b>${res}</b></div>`:''}
     </div>`;
   }
 
@@ -802,7 +817,7 @@ function renderAdminResults() {
     const completed = ALL_REAL.filter(m =>  allResults[m.id]);
     let html = pending.map(cardHtml).join('');
     if (completed.length) {
-      html += `<div class="phase-hdr" style="margin:20px 0 10px">≡ƒÅü COMPLETED (${completed.length})</div>`;
+      html += `<div class="phase-hdr" style="margin:20px 0 10px">🏁 COMPLETED (${completed.length})</div>`;
       html += completed.map(cardHtml).join('');
     }
     document.getElementById('admin-out').innerHTML = html;
@@ -819,14 +834,14 @@ function renderAdminResults() {
 async function adminSetResult(mid, winner) {
   if(!isAdmin) return;
   const btn = event.target;
-  btn.textContent = 'ΓÅ│';  btn.disabled = true;
+  btn.textContent = '→';  btn.disabled = true;
   allResults[mid] = winner;
   renderAdminResults(); renderMatches(); updateHero();
   await saveResult(mid, winner);
   const p=calcPts(mid);
-  if(p>0)                toast(`≡ƒÄë Result saved! +${p} pts for you`);
+  if(p>0)                toast(`🎯 Result saved! +${p} pts for you`);
   else if(p===0&&myPredictions[mid]) toast('Result saved. Wrong pick.','err');
-  else                   toast(`Γ£à Match ${mid}: ${winner} won`);
+  else                   toast(`✅ Match ${mid}: ${winner} won`);
 }
 
 async function adminClearResult(mid) {
@@ -845,7 +860,7 @@ function setAdminFilter(f,btn){
 }
 
 function renderAdminMatchStatus() {
-  // Exclude TBD playoffs ΓÇö managed separately in Playoffs tab
+  // Exclude TBD playoffs — managed separately in Playoffs tab
   const nonTBD    = REAL_MATCHES.filter(m => m.t1 !== 'TBD' && m.t2 !== 'TBD');
   const pending   = nonTBD.filter(m => !allResults[m.id]);
   const completed = nonTBD.filter(m =>  allResults[m.id]);
@@ -853,21 +868,21 @@ function renderAdminMatchStatus() {
   function cardHtml(m) {
     const locked = isMatchLocked(m), res = allResults[m.id];
     return `<div class="ac">
-      <div class="ac-title">Match ${m.id} ┬╖ ${m.t1} vs ${m.t2}</div>
-      <div class="ac-sub">${m.date} ┬╖ ${matchTimeLabel(m)}</div>
+      <div class="ac-title">Match ${m.id} · ${m.t1} vs ${m.t2}</div>
+      <div class="ac-sub">${m.date} · ${matchTimeLabel(m)}</div>
       <div style="font-size:11px;margin-bottom:8px;color:${res?'var(--green)':locked?'var(--red)':'var(--green)'}">
-        ${res?'Γ£à Result entered':locked?'≡ƒöÆ Auto-locked':'≡ƒƒó Open ┬╖ '+countdownLabel(m)}
+        ${res?'✅ Result entered':locked?'🔒 Auto-locked':'📋 Open · '+countdownLabel(m)}
       </div>
       <div class="ac-btns">
-        <button class="arbtn" onclick="adminForceLock(${m.id})">≡ƒöÆ Force Lock</button>
-        <button class="arbtn" onclick="adminForceOpen(${m.id})">≡ƒöô Force Open</button>
+        <button class="arbtn" onclick="adminForceLock(${m.id})">🔒 Force Lock</button>
+        <button class="arbtn" onclick="adminForceOpen(${m.id})">🔓 Force Open</button>
       </div>
     </div>`;
   }
 
   let html = pending.map(cardHtml).join('');
   if (completed.length) {
-    html += `<div class="phase-hdr" style="margin:20px 0 10px">≡ƒÅü COMPLETED (${completed.length})</div>`;
+    html += `<div class="phase-hdr" style="margin:20px 0 10px">🏁 COMPLETED (${completed.length})</div>`;
     html += completed.map(cardHtml).join('');
   }
   document.getElementById('admin-match-status').innerHTML = html || '<div style="color:var(--muted);font-size:13px;padding:12px 0">No matches.</div>';
@@ -890,7 +905,7 @@ async function renderAdminUsers() {
   await loadPlayers();
   if (!allPlayers.length) {
     el.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:12px 0">
-      No players yet ΓÇö players appear here after they sign up and log in.
+      No players yet — players appear here after they sign up and log in.
     </div>`;
     return;
   }
@@ -901,7 +916,7 @@ async function renderAdminUsers() {
     <div class="user-card">
       <div class="uc-av" style="background:${p.color}22;color:${p.color}">${p.avatar}</div>
       <div class="uc-info">
-        <div class="uc-name">${p.name} ${p.isAdmin ? '≡ƒöÉ' : ''}</div>
+        <div class="uc-name">${p.name} ${p.isAdmin ? '🔐' : ''}</div>
         <div class="uc-email">${p.email || 'No email'}</div>
         <div style="font-size:11px;color:var(--gold);margin-top:2px">
           ${p.pts} pts &middot; ${p.corr} correct &middot; ${p.pred} predicted
@@ -910,17 +925,17 @@ async function renderAdminUsers() {
       <div class="uc-btns">
         <button class="uc-btn ${p.isAdmin ? '' : 'admin-promote'}"
           onclick="adminToggleAdmin('${p.uid}', ${p.isAdmin})">
-          ${p.isAdmin ? 'Γ£à Admin' : 'Make Admin'}
+          ${p.isAdmin ? '✅ Admin' : 'Make Admin'}
         </button>
         <button class="uc-btn" onclick="adminPickForUser('${p.uid}', '${safeName}')">
-          ≡ƒÅÅ Pick
+          👤 Pick
         </button>
         <button class="uc-btn" onclick="adminResetUserPreds('${p.uid}', '${safeName}')">
           Reset Preds
         </button>
         ${!isMe ? `<button class="uc-btn" style="color:var(--red);border-color:rgba(255,87,51,0.3)"
           onclick="adminDeleteUser('${p.uid}', '${safeName}')">
-          ≡ƒùæ Delete
+          🗑 Delete
         </button>` : '<button class="uc-btn" style="opacity:0.3;cursor:default">You</button>'}
       </div>
     </div>`;
@@ -932,11 +947,11 @@ async function adminToggleAdmin(uid, currently) {
   const { error } = await sb.from('profiles').update({ is_admin: newVal }).eq('id', uid);
   if (error) {
     console.error('adminToggleAdmin:', error.message);
-    toast('Failed to update ΓÇö check Supabase RLS policy', 'err');
+    toast('Failed to update — check Supabase RLS policy', 'err');
     return;
   }
   await renderAdminUsers();
-  toast(newVal ? '≡ƒöÉ User promoted to admin' : 'Admin access removed', 'warn');
+  toast(newVal ? '🔐 User promoted to admin' : 'Admin access removed', 'warn');
 }
 
 async function adminResetUserPreds(uid, name) {
@@ -945,7 +960,7 @@ async function adminResetUserPreds(uid, name) {
   const { error: e2 } = await sb.from('profiles').update({ total_pts:0, correct:0, predicted:0 }).eq('id', uid);
   if (e1 || e2) {
     console.error('resetUserPreds:', e1?.message, e2?.message);
-    toast('Error resetting ΓÇö check console', 'err');
+    toast('Error resetting — check console', 'err');
     return;
   }
   if (uid === currentUser.id) { myPredictions = {}; }
@@ -957,7 +972,7 @@ async function adminResetUserPreds(uid, name) {
   toast(`${name}'s predictions cleared`, 'warn');
 }
 
-// ΓöÇΓöÇ Admin: pick on behalf of a user ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Admin: pick on behalf of a user -------------------------
 async function adminPickForUser(uid, name) {
   // Build a pick modal overlay
   const existing = document.getElementById('admin-pick-modal');
@@ -970,23 +985,23 @@ async function adminPickForUser(uid, name) {
     display:flex;align-items:center;justify-content:center;padding:20px;
   `;
 
-  // Build match options ΓÇö show all real matches grouped, highlight locked ones
+  // Build match options — show all real matches grouped, highlight locked ones
   const matchOpts = REAL_MATCHES.map(m => {
     const locked = isMatchLocked(m) || allResults[m.id];
-    const label = `M${m.id}: ${m.t1} vs ${m.t2} (${m.date})${locked ? ' ≡ƒöÆ' : ''}`;
+    const label = `M${m.id}: ${m.t1} vs ${m.t2} (${m.date})${locked ? ' 🔒' : ''}`;
     return `<option value="${m.id}">${label}</option>`;
   }).join('');
 
   modal.innerHTML = `
     <div style="background:#0e1120;border:1px solid rgba(245,200,66,0.3);border-radius:16px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto">
       <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:#f5c842;margin-bottom:4px">PICK FOR ${name.toUpperCase()}</div>
-      <div style="font-size:12px;color:#6b7280;margin-bottom:20px">Admin override ΓÇö bypasses lock</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:20px">Admin override — bypasses lock</div>
 
       <div style="margin-bottom:14px">
         <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#6b7280;display:block;margin-bottom:6px">Match</label>
         <select id="apf-match" style="width:100%;padding:10px 12px;border-radius:9px;border:1px solid rgba(255,255,255,0.12);background:#151826;color:#e8eaf0;font-size:13px;outline:none"
           onchange="adminPickUpdateTeams()">
-          <option value="">ΓÇö Select match ΓÇö</option>
+          <option value="">— Select match —</option>
           ${matchOpts}
         </select>
       </div>
@@ -1059,7 +1074,7 @@ async function adminPickSubmit() {
   const btn = document.getElementById('apf-submit');
   btn.textContent = 'SAVING...'; btn.disabled = true;
 
-  // Admin uses upsert ΓÇö bypasses lock completely
+  // Admin uses upsert — bypasses lock completely
   const { error } = await sb.from('predictions').upsert(
     { user_id: uid, match_id: mid, pick: team, updated_at: new Date().toISOString() },
     { onConflict: 'user_id,match_id' }
@@ -1067,9 +1082,9 @@ async function adminPickSubmit() {
 
   if (error) {
     console.error('adminPickSubmit:', error.message);
-    // RLS may block inserting for other users ΓÇö show helpful message
+    // RLS may block inserting for other users — show helpful message
     if (error.message.includes('row-level security') || error.code === '42501') {
-      toast('Run the SQL fix in Supabase first ΓÇö see admin panel', 'err');
+      toast('Run the SQL fix in Supabase first — see admin panel', 'err');
     } else {
       toast('Failed: ' + error.message, 'err');
     }
@@ -1093,19 +1108,19 @@ async function adminPickSubmit() {
 
   document.getElementById('admin-pick-modal').remove();
   await renderAdminUsers();
-  toast(`Γ£à Picked ${team} for Match ${mid} on behalf of ${name}`);
+  toast(`✅ Picked ${team} for Match ${mid} on behalf of ${name}`);
 }
 
-// ΓöÇΓöÇ Admin: delete a user completely ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Admin: delete a user completely --------------------------
 async function adminDeleteUser(uid, name) {
   if (!confirm(`Delete ${name} completely?\nThis removes their account, all predictions and points. Cannot be undone.`)) return;
-  if (!confirm(`Last chance ΓÇö permanently delete ${name}?`)) return;
+  if (!confirm(`Last chance — permanently delete ${name}?`)) return;
 
   // Delete predictions
   await sb.from('predictions').delete().eq('user_id', uid);
   // Delete profile
   await sb.from('profiles').delete().eq('id', uid);
-  // Delete auth user via Supabase admin API (requires service role ΓÇö soft delete via profile only)
+  // Delete auth user via Supabase admin API (requires service role — soft delete via profile only)
   // Note: full auth deletion needs service role key, so we just remove profile + predictions
   // The user won't be able to log in meaningfully without a profile
 
@@ -1121,7 +1136,7 @@ async function sendBroadcast(){
   const msg=document.getElementById('broadcast-msg').value.trim();
   if(!msg){toast('Enter a message first','err');return;}
   await sb.from('broadcast').update({message:msg,set_at:new Date().toISOString()}).eq('id',1);
-  showBroadcast(msg);toast('≡ƒôó Broadcast sent!');
+  showBroadcast(msg);toast('📢 Broadcast sent!');
 }
 async function clearBroadcast(){
   await sb.from('broadcast').update({message:null}).eq('id',1);
@@ -1129,13 +1144,13 @@ async function clearBroadcast(){
   toast('Banner cleared');
 }
 function showBroadcast(msg){
-  document.getElementById('broadcast-text').textContent='≡ƒôó '+msg;
+  document.getElementById('broadcast-text').textContent='📢 '+msg;
   document.getElementById('broadcast-banner').classList.remove('hidden');
 }
 function dismissBanner(){document.getElementById('broadcast-banner').classList.add('hidden');}
 
 async function adminResetAllResults(){
-  if(!confirm('ΓÜá Clear ALL results? All points reset to 0.')) return;
+  if(!confirm('⚠ Clear ALL results? All points reset to 0.')) return;
   await sb.from('results').delete().neq('match_id',0);
   allResults={};
   await recalcAllPlayerPoints();
@@ -1143,20 +1158,20 @@ async function adminResetAllResults(){
   toast('All results cleared','warn');
 }
 async function adminResetAllPredictions(){
-  if(!confirm('ΓÜá Clear ALL predictions for ALL players?')) return;
+  if(!confirm('⚠ Clear ALL predictions for ALL players?')) return;
   await sb.from('predictions').delete().neq('id','00000000-0000-0000-0000-000000000000');
   await sb.from('profiles').update({total_pts:0,correct:0,predicted:0}).neq('id','00000000-0000-0000-0000-000000000000');
   myPredictions={};
   renderMatches();updateHero();toast('All predictions cleared','warn');
 }
 async function adminResetSeason(){
-  if(!confirm('ΓÜáΓÜá FULL SEASON RESET?')||!confirm('Last chance ΓÇö cannot undo!')) return;
+  if(!confirm('⚠⚠ FULL SEASON RESET?')||!confirm('Last chance — cannot undo!')) return;
   await adminResetAllResults();
   await adminResetAllPredictions();
-  toast('≡ƒöä Full season reset','warn');
+  toast('🔄 Full season reset','warn');
 }
 
-// ΓöÇΓöÇ Auth ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Auth ------------------------------------------------------
 function showForgotPassword() {
   // Hide all forms
   document.getElementById('form-login').classList.add('hidden');
@@ -1191,7 +1206,7 @@ async function doForgotPassword() {
     errEl.textContent = error.message;
   } else {
     errEl.style.color = 'var(--green)';
-    errEl.textContent = 'Γ£à Reset link sent! Check your email.';
+    errEl.textContent = '✅ Reset link sent! Check your email.';
   }
 }
 
@@ -1244,7 +1259,7 @@ async function doSignup(){
   if(error){errEl.textContent=error.message;return;}
   if(data.user&&!data.session){
     errEl.style.color='var(--green)';
-    errEl.textContent='Γ£à Check your email to confirm, then sign in!';
+    errEl.textContent='✅ Check your email to confirm, then sign in!';
   } else if(data.user) await onLogin(data.user);
 }
 
@@ -1268,7 +1283,7 @@ async function doResetPassword() {
 
   if (error) { errEl.textContent = error.message; return; }
   errEl.style.color = 'var(--green)';
-  errEl.textContent = 'Γ£à Reset link sent! Check your email.';
+  errEl.textContent = '✅ Reset link sent! Check your email.';
 }
 
 function showResetForm() {
@@ -1319,7 +1334,7 @@ async function doReset(){
   
   if(error){ errEl.textContent = error.message; return; }
   errEl.style.color = 'var(--green)';
-  errEl.textContent = 'Γ£à Reset link sent! Check your email.';
+  errEl.textContent = '✅ Reset link sent! Check your email.';
   document.getElementById('reset-btn-txt').textContent = 'Email Sent!';
 }
 
@@ -1333,16 +1348,16 @@ async function doLogout(){
   stopClock();
   await sb.auth.signOut();
   myPredictions={};currentUser=null;isAdmin=false;
-  showScreen('auth');toast('Signed out ≡ƒæï');
+  showScreen('auth');toast('Signed out 👋');
 }
 
 function setAuthLoading(form,on){
-  document.getElementById(`${form}-btn-txt`).textContent=on?(form==='login'?'Signing inΓÇª':'CreatingΓÇª'):(form==='login'?'Sign In':'Create Account');
+  document.getElementById(`${form}-btn-txt`).textContent=on?(form==='login'?'Signing in…':'Creating…'):(form==='login'?'Sign In':'Create Account');
   document.getElementById(`${form}-spinner`).classList.toggle('hidden',!on);
   document.querySelector(`#form-${form} .auth-btn`).disabled=on;
 }
 
-// ΓöÇΓöÇ Nav ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Nav -------------------------------------------------------
 async function go(id,btn){
   if(!isAdmin&&id==='admin') return;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
@@ -1377,7 +1392,7 @@ function showScreen(which){
   document.getElementById('app-screen').classList.toggle('hidden',which!=='app');
 }
 
-// ΓöÇΓöÇ Admin: Playoff schedule editor ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Admin: Playoff schedule editor --------------------------
 function renderAdminPlayoffs() {
   const el = document.getElementById('admin-playoffs');
   if (!el) return;
@@ -1393,23 +1408,23 @@ function renderAdminPlayoffs() {
     const isTBD = m.t1 === 'TBD' || m.t2 === 'TBD';
 
     return `<div class="ac" style="border-color:${isTBD?'rgba(245,200,66,0.2)':'rgba(39,174,96,0.3)'}">
-      <div class="ac-title" style="color:var(--gold)">${m.label || 'Match '+m.id} ┬╖ ${m.date}</div>
+      <div class="ac-title" style="color:var(--gold)">${m.label || 'Match '+m.id} · ${m.date}</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px">
-        Currently: <b style="color:${isTBD?'var(--gold)':'var(--green)'}">${m.t1} vs ${m.t2}</b> ┬╖ ${m.venue}
+        Currently: <b style="color:${isTBD?'var(--gold)':'var(--green)'}">${m.t1} vs ${m.t2}</b> · ${m.venue}
       </div>
       <div style="display:grid;gap:10px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div>
             <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px">Team 1</label>
             <select id="po-t1-${m.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#151826;color:#e8eaf0;font-size:13px">
-              <option value="TBD">ΓÇö TBD ΓÇö</option>
+              <option value="TBD">— TBD —</option>
               ${teamOpts}
             </select>
           </div>
           <div>
             <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);display:block;margin-bottom:4px">Team 2</label>
             <select id="po-t2-${m.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#151826;color:#e8eaf0;font-size:13px">
-              <option value="TBD">ΓÇö TBD ΓÇö</option>
+              <option value="TBD">— TBD —</option>
               ${teamOpts2}
             </select>
           </div>
@@ -1421,9 +1436,9 @@ function renderAdminPlayoffs() {
         </div>
         <div style="display:flex;gap:8px">
           <button class="arbtn" style="flex:1;background:rgba(245,200,66,0.15);border-color:rgba(245,200,66,0.4);color:var(--gold);font-weight:700"
-            onclick="adminSavePlayoff(${m.id})">≡ƒÆ╛ Save Matchup</button>
+            onclick="adminSavePlayoff(${m.id})">💾 Save Matchup</button>
           <button class="arbtn" style="color:var(--muted)"
-            onclick="adminResetPlayoff(${m.id})">Γå║ Reset</button>
+            onclick="adminResetPlayoff(${m.id})">→║ Reset</button>
         </div>
       </div>
     </div>`;
@@ -1441,23 +1456,23 @@ async function adminSavePlayoff(mid) {
 
   // Disable save button while writing
   const saveBtn = document.querySelector(`#admin-playoffs [onclick="adminSavePlayoff(${mid})"]`);
-  if (saveBtn) { saveBtn.textContent = 'ΓÅ│ SavingΓÇª'; saveBtn.disabled = true; }
+  if (saveBtn) { saveBtn.textContent = '→ Saving…'; saveBtn.disabled = true; }
 
   try {
     await savePlayoffOverride(mid, { t1, t2, venue });
   } catch(e) {
-    toast('Failed to save ΓÇö check Supabase playoff_config table', 'err');
-    if (saveBtn) { saveBtn.textContent = '≡ƒÆ╛ Save Matchup'; saveBtn.disabled = false; }
+    toast('Failed to save — check Supabase playoff_config table', 'err');
+    if (saveBtn) { saveBtn.textContent = '💾 Save Matchup'; saveBtn.disabled = false; }
     return;
   }
 
   m.t1 = t1; m.t2 = t2; m.venue = venue;
 
-  // REAL_MATCHES includes all matches ΓÇö card re-renders via renderMatches()
+  // REAL_MATCHES includes all matches — card re-renders via renderMatches()
 
   renderAdminPlayoffs();
   renderMatches();
-  toast(`Γ£à ${m.label} updated: ${t1} vs ${t2}`);
+  toast(`✅ ${m.label} updated: ${t1} vs ${t2}`);
 }
 
 async function adminResetPlayoff(mid) {
@@ -1466,13 +1481,13 @@ async function adminResetPlayoff(mid) {
   if (!m) return;
   await clearPlayoffOverride(mid);
   m.t1 = 'TBD'; m.t2 = 'TBD'; m.venue = 'TBD';
-  // REAL_MATCHES always includes playoff entries ΓÇö tbdCard handles display
+  // REAL_MATCHES always includes playoff entries — tbdCard handles display
   renderAdminPlayoffs();
   renderMatches();
   toast('Playoff matchup reset to TBD', 'warn');
 }
 
-// ΓöÇΓöÇ Toast ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// -- Toast -----------------------------------------------------
 function strToColor(s){
   let h=0;for(let i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)-h);
   return['#ffc107','#ff5733','#4da6ff','#b44dff','#25d366','#4dffaa','#ff7a33','#4dcccc'][Math.abs(h)%8];
